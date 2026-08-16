@@ -1,40 +1,66 @@
-# Resume ATS Tracker
+# 📄 Resume ATS Tracker
 
-A Streamlit app that scores a resume against a job description using the Google Gemini API,
-reporting an ATS-style match score, matched/missing keywords, strengths, weaknesses, and
-concrete suggestions to improve the resume.
+A Streamlit app that scores a resume against a job description using the Google Gemini API —
+get an ATS-style match score, a keyword gap analysis, a tailored cover letter, and AI-rewritten
+resume bullets, all in one place.
 
-## Setup
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Streamlit](https://img.shields.io/badge/streamlit-app-FF4B4B)
+![Gemini](https://img.shields.io/badge/AI-Gemini-8E75B2)
+
+---
+
+## ✨ Features
+
+| | |
+|---|---|
+| 🎯 **Match Score** | 0–100 ATS-style score with a one-line verdict on overall fit |
+| 🔑 **Keyword Gap Analysis** | Matched vs. missing keywords pulled straight from the job description |
+| 💪 **Strengths & Weaknesses** | Plain-language breakdown of what's working and what's not |
+| 🛠️ **Actionable Suggestions** | Concrete edits to improve the resume for the target role |
+| 📐 **ATS Formatting Risks** | Flags parsing hazards like tables, columns, or missing sections |
+| ✍️ **Cover Letter Generator** | One click drafts a tailored cover letter from the resume + JD |
+| 🔁 **Bullet Rewriter** | Rewrites the weakest resume bullets with stronger, keyword-aligned phrasing |
+
+## 🚀 Quick Start
+
+**1. Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey), then edit
-the `.env` file in the project root:
+**2. Add your Gemini API key**
+
+Get one from [Google AI Studio](https://aistudio.google.com/apikey), then edit the `.env` file
+in the project root:
 
 ```bash
 GEMINI_API_KEY=your-api-key-here
 GEMINI_MODEL=gemini-3.6-flash
 ```
 
-## Run
+**3. Run the app**
 
 ```bash
 streamlit run app.py
 ```
 
-Then in the app: upload or paste a resume, paste a job description, and click **Analyze Resume**.
+**4. Use it** — upload or paste a resume, paste a job description, and click **Analyze Resume**.
 
-## Features
+## 🗂️ Project Structure
 
-- ATS match score (0-100), verdict, and matched/missing keyword breakdown
-- Strengths, weaknesses, actionable suggestions, and ATS formatting-risk detection
-- **Cover letter generator** — one click to draft a tailored cover letter from the resume + JD
-- **Bullet rewriter** — Gemini rewrites the weakest resume bullets to better match the JD, with a reason for each change
+```
+Resume-ATS-Tracking/
+├── app.py              # Streamlit UI + Gemini calls + result rendering
+├── resume_parser.py    # PDF / DOCX / TXT text extraction for uploaded resumes
+├── requirements.txt    # Python dependencies
+└── .env                # Gemini API key & model config (not committed)
+```
 
-## Files
+## 🧰 Tech Stack
 
-- `app.py` — Streamlit UI + Gemini call + result rendering
-- `resume_parser.py` — PDF/DOCX/TXT text extraction for uploaded resumes
-- `requirements.txt` — Python dependencies
+- [Streamlit](https://streamlit.io/) — UI
+- [Google Gemini API](https://ai.google.dev/) — resume/JD analysis, cover letters, bullet rewrites
+- `pdfplumber` / `python-docx` — resume text extraction
+- `fpdf2` — PDF report export
