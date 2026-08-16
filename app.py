@@ -1,0 +1,490 @@
+import io
+import json
+import os
+import re
+
+import streamlit as st
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
+from fpdf import FPDF
+
+from resume_parser import extract_text
+
+# Config
+
+load_dotenv()
+
+api_key = os.getenv("GEMINI_API_KEY", "")
+model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+
+st.set_page_config(
+    page_title="Resume ATS Tracker",
+    page_icon="📄",
+    layout="wide",
+)
+
+# Main Layout
+
+st.title("📄 Resume ATS Tracker")
+st.write(
+    "Upload a resume and paste a job description to get an ATS-style match "
+    "score, keyword gap analysis, and tailored improvement suggestions — "
+    "powered by Gemini."
+)
+st.caption(f"Model: `{model_name}`" + (" · API key loaded " if api_key else " · ⚠️ GEMINI_API_KEY not set"))
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("1. Resume")
+    resume_file = st.file_uploader(
+        "Upload resume (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"]
+    )
+    resume_text_manual = st.text_area(
+        "...or paste resume text directly",
+        height=220,
+        placeholder="Paste resume content here if you'd rather not upload a file.",
+    )
+
+with col2:
+    st.subheader("2. Job Description")
+    jd_text = st.text_area(
+        "Paste the target job description",
+        height=300,
+        placeholder="Paste the full job posting text here...",
+    )
+
+analyze_clicked = st.button("🔍 Analyze Resume", type="primary", use_container_width=True)
+
+
+# Prompts
+
+ANALYSIS_PROMPT = """You are an expert ATS (Applicant Tracking System) and technical recruiter.
+Compare the RESUME to the JOB DESCRIPTION below and evaluate how well the resume would score
+in a real ATS + human recruiter screen.
+
+Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this schema:
+
+{{
+  "match_score": <integer 0-100, overall ATS/keyword + relevance match score>,
+  "verdict": "<one short sentence summarizing fit>",
+  "matched_keywords": ["...keywords/skills from the JD found in the resume..."],
+  "missing_keywords": ["...important keywords/skills from the JD missing from the resume..."],
+  "strengths": ["...bullet points on what the resume does well for this JD..."],
+  "weaknesses": ["...bullet points on gaps or weaknesses relative to this JD..."],
+  "suggestions": ["...specific, actionable edits to improve the resume for this JD..."],
+  "formatting_issues": ["...any ATS-parsing risks: tables, images, columns, headers/footers, fonts, etc. Empty list if none obviously detectable from text..."]
+}}
+
+RESUME:
+\"\"\"
+{resume}
+\"\"\"
+
+JOB DESCRIPTION:
+\"\"\"
+{jd}
+\"\"\"
+"""
+
+COVER_LETTER_PROMPT = """You are an expert career coach writing a cover letter for a job applicant.
+
+Using ONLY facts present in the RESUME below, write a concise, compelling cover letter
+(3-4 short paragraphs) tailored to the JOB DESCRIPTION. Requirements:
+- Professional but natural tone — no generic clichés like "I am writing to express my interest".
+- Open with a specific, engaging hook relevant to the role/company.
+- Highlight the 2-3 most relevant pieces of experience/skills for THIS job.
+- Do not fabricate experience, employers, titles, or metrics not present in the resume.
+- Close with a brief, confident call to action.
+- Return ONLY the cover letter body text — no subject line, no markdown, no commentary.
+
+RESUME:
+\"\"\"
+{resume}
+\"\"\"
+
+JOB DESCRIPTION:
+\"\"\"
+{jd}
+\"\"\"
+"""
+
+BULLET_REWRITE_PROMPT = """You are an expert resume writer optimizing bullet points for both ATS
+keyword matching and human readability.
+
+From the RESUME below, pick the 5-8 bullet points that are weakest or least aligned with the
+JOB DESCRIPTION (vague language, missing metrics, missing relevant keywords, weak verbs), and
+rewrite each one to be stronger. Rules:
+- Do NOT invent facts, numbers, employers, or tools that aren't implied by the original bullet.
+- Prefer strong action verbs and, where the original implies a metric, make it explicit.
+- Naturally weave in relevant keywords from the job description where truthful.
+- Keep each rewritten bullet to one line.
+
+Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this schema:
+
+{{
+  "rewrites": [
+    {{"original": "<verbatim original bullet>", "improved": "<rewritten bullet>", "reason": "<short reason for the change>"}}
+  ]
+}}
+
+RESUME:
+\"\"\"
+{resume}
+\"\"\"
+
+JOB DESCRIPTION:
+\"\"\"
+{jd}
+\"\"\"
+"""
+
+# Helpers
+
+
+def parse_json_response(raw_text: str) -> dict:
+    """Best-effort extraction of a JSON object from the model's response."""
+    text = raw_text.strip()
+    # Strip markdown code fences if present.
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Fallback: grab the first {...} block.
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        return json.loads(match.group(0))
+    raise ValueError("Could not parse a JSON object from the model response.")
+
+
+def call_gemini_json(api_key: str, model_name: str, prompt: str) -> dict:
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.2,
+            response_mime_type="application/json",
+        ),
+    )
+    return parse_json_response(response.text)
+
+
+def call_gemini_text(api_key: str, model_name: str, prompt: str) -> str:
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.4),
+    )
+    return response.text.strip()
+
+
+def analyze_resume(api_key: str, model_name: str, resume: str, jd: str) -> dict:
+    prompt = ANALYSIS_PROMPT.format(resume=resume[:15000], jd=jd[:8000])
+    return call_gemini_json(api_key, model_name, prompt)
+
+
+def generate_cover_letter(api_key: str, model_name: str, resume: str, jd: str) -> str:
+    prompt = COVER_LETTER_PROMPT.format(resume=resume[:15000], jd=jd[:8000])
+    return call_gemini_text(api_key, model_name, prompt)
+
+
+def rewrite_bullets(api_key: str, model_name: str, resume: str, jd: str) -> list:
+    prompt = BULLET_REWRITE_PROMPT.format(resume=resume[:15000], jd=jd[:8000])
+    data = call_gemini_json(api_key, model_name, prompt)
+    return data.get("rewrites", [])
+
+
+def score_color(score: int) -> str:
+    if score >= 80:
+        return "🟢"
+    if score >= 60:
+        return "🟡"
+    return "🔴"
+
+
+def _pdf_safe(text: str) -> str:
+    """Core PDF fonts only support Latin-1 — drop anything outside that range."""
+    if not text:
+        return ""
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
+def build_pdf_report(result: dict, cover_letter: str = None, bullet_rewrites: list = None) -> bytes:
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    def mc(h, text):
+        # fpdf2's multi_cell defaults to leaving the cursor at the right edge
+        # of the cell (new_x="RIGHT") — pin it back to the left margin after
+        # every call, or the next call runs out of horizontal space.
+        pdf.multi_cell(0, h, _pdf_safe(text), new_x="LMARGIN", new_y="NEXT")
+
+    def heading(text, size=13):
+        pdf.set_font("Helvetica", "B", size)
+        pdf.ln(3)
+        mc(8, text)
+        pdf.set_font("Helvetica", "", 11)
+
+    def body(text):
+        mc(6, text)
+
+    def bullet_list(items):
+        pdf.set_font("Helvetica", "", 11)
+        for item in items:
+            mc(6, f"- {item}")
+
+    score = int(result.get("match_score", 0))
+
+    pdf.set_font("Helvetica", "B", 18)
+    mc(10, "Resume ATS Report")
+    pdf.set_font("Helvetica", "", 12)
+    mc(8, f"Match Score: {score}/100")
+    mc(8, f"Verdict: {result.get('verdict', '')}")
+
+    heading("Matched Keywords")
+    body(", ".join(result.get("matched_keywords", [])) or "None")
+
+    heading("Missing Keywords")
+    body(", ".join(result.get("missing_keywords", [])) or "None")
+
+    heading("Strengths")
+    bullet_list(result.get("strengths", []))
+
+    heading("Weaknesses")
+    bullet_list(result.get("weaknesses", []))
+
+    heading("Suggestions")
+    bullet_list(result.get("suggestions", []))
+
+    fmt_issues = result.get("formatting_issues", [])
+    if fmt_issues:
+        heading("ATS Formatting Risks")
+        bullet_list(fmt_issues)
+
+    if bullet_rewrites:
+        heading("Suggested Bullet Rewrites")
+        for r in bullet_rewrites:
+            pdf.set_font("Helvetica", "B", 11)
+            mc(6, "Original: " + r.get("original", ""))
+            pdf.set_font("Helvetica", "", 11)
+            mc(6, "Improved: " + r.get("improved", ""))
+            if r.get("reason"):
+                pdf.set_font("Helvetica", "I", 10)
+                mc(6, "Why: " + r.get("reason", ""))
+            pdf.ln(2)
+
+    if cover_letter:
+        heading("Cover Letter")
+        body(cover_letter)
+
+    return bytes(pdf.output())
+
+
+# Run analysis
+
+if analyze_clicked:
+    if not api_key:
+        st.error(
+            "No Gemini API key found. Add `GEMINI_API_KEY=your-key` to a `.env` "
+            "file in the project root, then restart the app."
+        )
+        st.stop()
+
+    resume_text = resume_text_manual.strip()
+    if not resume_text and resume_file is not None:
+        try:
+            resume_text = extract_text(resume_file)
+        except Exception as e:
+            st.error(f"Could not read the resume file: {e}")
+            st.stop()
+
+    if not resume_text:
+        st.error("Please upload a resume file or paste resume text.")
+        st.stop()
+    if not jd_text.strip():
+        st.error("Please paste a job description.")
+        st.stop()
+
+    with st.spinner(f"Analyzing with {model_name}..."):
+        try:
+            result = analyze_resume(api_key, model_name, resume_text, jd_text)
+        except Exception as e:
+            st.error(
+                f"Gemini API call failed: {e}\n\n"
+                "If this is a 'model not found' error, set GEMINI_MODEL in your "
+                "`.env` file to a different model id (e.g. gemini-2.5-flash) and "
+                "restart the app."
+            )
+            st.stop()
+
+    st.session_state["last_result"] = result
+    st.session_state["resume_text"] = resume_text
+    st.session_state["jd_text"] = jd_text
+    # Clear any previously generated extras from an older resume/JD pair.
+    st.session_state.pop("cover_letter", None)
+    st.session_state.pop("bullet_rewrites", None)
+
+
+# Render results
+
+result = st.session_state.get("last_result")
+if result:
+    saved_resume = st.session_state.get("resume_text", "")
+    saved_jd = st.session_state.get("jd_text", "")
+
+    st.divider()
+    score = int(result.get("match_score", 0))
+
+    top1, top2 = st.columns([1, 3])
+    with top1:
+        st.metric("ATS Match Score", f"{score}/100", delta=None)
+        st.progress(min(max(score, 0), 100) / 100)
+    with top2:
+        st.subheader(f"{score_color(score)} Verdict")
+        st.write(result.get("verdict", "—"))
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("✅ Matched Keywords")
+        kws = result.get("matched_keywords", [])
+        st.write(", ".join(f"`{k}`" for k in kws) if kws else "None found.")
+
+        st.subheader("💪 Strengths")
+        for s in result.get("strengths", []):
+            st.markdown(f"- {s}")
+
+    with c2:
+        st.subheader("❌ Missing Keywords")
+        mkws = result.get("missing_keywords", [])
+        st.write(", ".join(f"`{k}`" for k in mkws) if mkws else "None — great coverage!")
+
+        st.subheader("⚠️ Weaknesses")
+        for w in result.get("weaknesses", []):
+            st.markdown(f"- {w}")
+
+    st.subheader("🛠️ Suggestions to Improve")
+    for sug in result.get("suggestions", []):
+        st.markdown(f"- {sug}")
+
+    fmt_issues = result.get("formatting_issues", [])
+    if fmt_issues:
+        st.subheader("📐 ATS Formatting Risks")
+        for f in fmt_issues:
+            st.markdown(f"- {f}")
+
+    # ----------------------------------------------------------------
+    # Extra features: cover letter + bullet rewriter
+    # ----------------------------------------------------------------
+    st.divider()
+    st.subheader("✨ More tools")
+    fcol1, fcol2 = st.columns(2)
+
+    with fcol1:
+        if st.button("✍️ Generate Cover Letter", use_container_width=True):
+            with st.spinner("Writing cover letter..."):
+                try:
+                    st.session_state["cover_letter"] = generate_cover_letter(
+                        api_key, model_name, saved_resume, saved_jd
+                    )
+                except Exception as e:
+                    st.error(f"Cover letter generation failed: {e}")
+
+    with fcol2:
+        if st.button("🔁 Rewrite Weak Bullets", use_container_width=True):
+            with st.spinner("Rewriting weak bullets..."):
+                try:
+                    st.session_state["bullet_rewrites"] = rewrite_bullets(
+                        api_key, model_name, saved_resume, saved_jd
+                    )
+                except Exception as e:
+                    st.error(f"Bullet rewriting failed: {e}")
+
+    cover_letter = st.session_state.get("cover_letter")
+    if cover_letter:
+        st.markdown("#### ✍️ Tailored Cover Letter")
+        st.text_area("Cover letter", value=cover_letter, height=280, label_visibility="collapsed")
+        st.download_button(
+            "⬇️ Download Cover Letter (.txt)",
+            data=cover_letter,
+            file_name="cover_letter.txt",
+            mime="text/plain",
+        )
+
+    bullet_rewrites = st.session_state.get("bullet_rewrites")
+    if bullet_rewrites:
+        st.markdown("#### 🔁 Suggested Bullet Rewrites")
+        for r in bullet_rewrites:
+            with st.container(border=True):
+                st.markdown(f"**Original:** {r.get('original', '')}")
+                st.markdown(f"**Improved:** {r.get('improved', '')}")
+                if r.get("reason"):
+                    st.caption(f"Why: {r.get('reason')}")
+
+    # Export
+
+    st.divider()
+    st.subheader("⬇️ Export Report")
+
+    report_md = f"""# Resume ATS Report
+
+**Match Score:** {score}/100
+**Verdict:** {result.get('verdict', '')}
+
+## Matched Keywords
+{', '.join(result.get('matched_keywords', [])) or 'None'}
+
+## Missing Keywords
+{', '.join(result.get('missing_keywords', [])) or 'None'}
+
+## Strengths
+{chr(10).join('- ' + s for s in result.get('strengths', []))}
+
+## Weaknesses
+{chr(10).join('- ' + w for w in result.get('weaknesses', []))}
+
+## Suggestions
+{chr(10).join('- ' + s for s in result.get('suggestions', []))}
+
+## Formatting Risks
+{chr(10).join('- ' + f for f in fmt_issues)}
+"""
+    if bullet_rewrites:
+        report_md += "\n## Suggested Bullet Rewrites\n"
+        for r in bullet_rewrites:
+            report_md += f"\n- **Original:** {r.get('original', '')}\n  **Improved:** {r.get('improved', '')}\n"
+            if r.get("reason"):
+                report_md += f"  *Why:* {r.get('reason')}\n"
+
+    if cover_letter:
+        report_md += f"\n## Cover Letter\n\n{cover_letter}\n"
+
+    ecol1, ecol2 = st.columns(2)
+    with ecol1:
+        st.download_button(
+            "⬇️ Download Report (Markdown)",
+            data=report_md,
+            file_name="resume_ats_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+    with ecol2:
+        try:
+            pdf_bytes = build_pdf_report(result, cover_letter=cover_letter, bullet_rewrites=bullet_rewrites)
+            st.download_button(
+                "⬇️ Download Report (PDF)",
+                data=pdf_bytes,
+                file_name="resume_ats_report.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.error(f"Could not build PDF: {e}")
+
+    with st.expander("Raw JSON response"):
+        st.json(result)
