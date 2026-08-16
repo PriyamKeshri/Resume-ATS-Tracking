@@ -311,7 +311,7 @@ if analyze_clicked:
         st.error("Please paste a job description.")
         st.stop()
 
-    with st.spinner(f"Analyzing with {model_name}..."):
+    with st.spinner("Analyzing your resume according to the job description..."):
         try:
             result = analyze_resume(api_key, model_name, resume_text, jd_text)
         except Exception as e:
