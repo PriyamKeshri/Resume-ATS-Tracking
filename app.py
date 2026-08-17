@@ -235,6 +235,28 @@ JOB DESCRIPTION:
 \"\"\"
 """
 
+GRAMMAR_PROMPT = """You are a meticulous proofreader reviewing a resume before it goes out to
+employers. Check ONLY for grammar, spelling, punctuation, and tense-consistency errors — do not
+comment on content, keyword coverage, or formatting; that is handled elsewhere.
+
+For every error you find, report the exact original snippet (verbatim, as it appears in the
+resume), the corrected version, the error type, and a one-line explanation. If the resume is
+clean, return an empty list.
+
+Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this schema:
+
+{{
+  "issues": [
+    {{"original": "<verbatim snippet with the error>", "corrected": "<corrected snippet>", "type": "<spelling | grammar | punctuation | tense | other>", "explanation": "<brief explanation>"}}
+  ]
+}}
+
+RESUME:
+\"\"\"
+{resume}
+\"\"\"
+"""
+
 # Helpers
 
 
@@ -294,6 +316,12 @@ def rewrite_bullets(api_key: str, model_name: str, resume: str, jd: str) -> list
     return data.get("rewrites", [])
 
 
+def check_grammar(api_key: str, model_name: str, resume: str) -> list:
+    prompt = GRAMMAR_PROMPT.format(resume=resume[:15000])
+    data = call_gemini_json(api_key, model_name, prompt)
+    return data.get("issues", [])
+
+
 def score_tier(score: int) -> str:
     if score >= 80:
         return "Strong match"
@@ -336,7 +364,12 @@ def _pdf_safe(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
-def build_pdf_report(result: dict, cover_letter: str = None, bullet_rewrites: list = None) -> bytes:
+def build_pdf_report(
+    result: dict,
+    cover_letter: str = None,
+    bullet_rewrites: list = None,
+    grammar_issues: list = None,
+) -> bytes:
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -401,6 +434,18 @@ def build_pdf_report(result: dict, cover_letter: str = None, bullet_rewrites: li
                 mc(6, "Why: " + r.get("reason", ""))
             pdf.ln(2)
 
+    if grammar_issues:
+        heading("Grammar & Spelling Issues")
+        for issue in grammar_issues:
+            pdf.set_font("Helvetica", "B", 11)
+            mc(6, "Original: " + issue.get("original", ""))
+            pdf.set_font("Helvetica", "", 11)
+            mc(6, "Corrected: " + issue.get("corrected", ""))
+            if issue.get("explanation"):
+                pdf.set_font("Helvetica", "I", 10)
+                mc(6, f"{issue.get('type', '')}: {issue.get('explanation', '')}")
+            pdf.ln(2)
+
     if cover_letter:
         heading("Cover Letter")
         body(cover_letter)
@@ -451,6 +496,7 @@ if analyze_clicked:
     # Clear any previously generated extras from an older resume/JD pair.
     st.session_state.pop("cover_letter", None)
     st.session_state.pop("bullet_rewrites", None)
+    st.session_state.pop("grammar_issues", None)
 
 
 # Render results
@@ -515,8 +561,8 @@ if result:
     st.divider()
     st.subheader("More Tools")
 
-    tab_cover, tab_bullets, tab_export = st.tabs(
-        ["Cover Letter", "Bullet Rewrites", "Export"]
+    tab_cover, tab_bullets, tab_grammar, tab_export = st.tabs(
+        ["Cover Letter", "Bullet Rewrites", "Grammar & Spelling", "Export"]
     )
 
     with tab_cover:
@@ -562,8 +608,36 @@ if result:
         else:
             st.caption("Click the button to get stronger rewrites of your weakest resume bullets.")
 
+    with tab_grammar:
+        if st.button("Check Grammar & Spelling", use_container_width=True):
+            with st.spinner("Proofreading resume..."):
+                try:
+                    st.session_state["grammar_issues"] = check_grammar(
+                        api_key, model_name, saved_resume
+                    )
+                except Exception as e:
+                    st.error(f"Grammar check failed: {e}")
+
+        grammar_issues = st.session_state.get("grammar_issues")
+        if grammar_issues is not None:
+            if grammar_issues:
+                for issue in grammar_issues:
+                    with st.container(border=True):
+                        st.markdown(f"**Original:** {issue.get('original', '')}")
+                        st.markdown(f"**Corrected:** {issue.get('corrected', '')}")
+                        issue_type = issue.get("type", "")
+                        explanation = issue.get("explanation", "")
+                        caption = " · ".join(x for x in [issue_type, explanation] if x)
+                        if caption:
+                            st.caption(caption)
+            else:
+                st.caption("No grammar or spelling issues found.")
+        else:
+            st.caption("Click the button to proofread the resume for grammar, spelling, and punctuation errors.")
+
     cover_letter = st.session_state.get("cover_letter")
     bullet_rewrites = st.session_state.get("bullet_rewrites")
+    grammar_issues = st.session_state.get("grammar_issues")
 
     with tab_export:
         report_md = f"""# Resume ATS Report
@@ -596,10 +670,17 @@ if result:
                 if r.get("reason"):
                     report_md += f"  *Why:* {r.get('reason')}\n"
 
+        if grammar_issues:
+            report_md += "\n## Grammar & Spelling Issues\n"
+            for issue in grammar_issues:
+                report_md += f"\n- **Original:** {issue.get('original', '')}\n  **Corrected:** {issue.get('corrected', '')}\n"
+                if issue.get("explanation"):
+                    report_md += f"  *{issue.get('type', '')}:* {issue.get('explanation', '')}\n"
+
         if cover_letter:
             report_md += f"\n## Cover Letter\n\n{cover_letter}\n"
 
-        st.caption("Download the full analysis — including the cover letter and bullet rewrites above, if generated.")
+        st.caption("Download the full analysis — including the cover letter, bullet rewrites, and grammar check above, if generated.")
         ecol1, ecol2 = st.columns(2)
         with ecol1:
             st.download_button(
@@ -611,7 +692,12 @@ if result:
             )
         with ecol2:
             try:
-                pdf_bytes = build_pdf_report(result, cover_letter=cover_letter, bullet_rewrites=bullet_rewrites)
+                pdf_bytes = build_pdf_report(
+                    result,
+                    cover_letter=cover_letter,
+                    bullet_rewrites=bullet_rewrites,
+                    grammar_issues=grammar_issues,
+                )
                 st.download_button(
                     "Download Report (PDF)",
                     data=pdf_bytes,
