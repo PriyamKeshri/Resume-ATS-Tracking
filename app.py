@@ -20,71 +20,89 @@ model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 st.set_page_config(
     page_title="Resume ATS Tracker",
-    page_icon="📄",
     layout="wide",
 )
 
 # --------------------------------------------------------------------------
-# Styling
+# Styling — editorial: serif headline, small-caps section labels, outlined
+# tags and a ring-style score gauge instead of colored candy.
 # --------------------------------------------------------------------------
 
 st.markdown(
     """
     <style>
     .hero-title {
-        font-size: 2.4rem;
-        font-weight: 800;
-        margin-bottom: 0.1rem;
-        background: linear-gradient(90deg, #6366f1, #ec4899);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 2.3rem;
+        font-weight: 400;
+        margin-bottom: 0.3rem;
+    }
+    .hero-eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.72rem;
+        opacity: 0.6;
+        margin-bottom: 0.9rem;
+    }
+    .hero-rule {
+        border: none;
+        border-top: 1px solid rgba(128, 128, 128, 0.35);
+        margin: 0 0 1rem 0;
     }
     .hero-subtitle {
         opacity: 0.75;
-        font-size: 1rem;
-        margin-bottom: 0.4rem;
+        font-size: 0.95rem;
+        margin-bottom: 0.3rem;
     }
-    .pill {
+    h3 {
+        text-transform: uppercase !important;
+        letter-spacing: 0.07em !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        opacity: 0.8;
+    }
+    .tag {
         display: inline-block;
-        padding: 4px 12px;
+        padding: 3px 10px;
         margin: 3px 6px 3px 0;
-        border-radius: 999px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border: 1px solid transparent;
+        border-radius: 4px;
+        font-size: 0.82rem;
+        border: 1px solid rgba(128, 128, 128, 0.4);
     }
-    .pill-good {
-        background: rgba(16, 185, 129, 0.14);
-        color: #10b981;
-        border-color: rgba(16, 185, 129, 0.4);
+    .tag-good {
+        border-color: rgba(22, 101, 52, 0.55);
     }
-    .pill-bad {
-        background: rgba(239, 68, 68, 0.14);
-        color: #ef4444;
-        border-color: rgba(239, 68, 68, 0.4);
+    .tag-bad {
+        border-color: rgba(153, 27, 27, 0.55);
     }
-    .score-badge {
-        width: 128px;
-        height: 128px;
+    .score-ring {
+        width: 110px;
+        height: 110px;
         border-radius: 50%;
+        border: 4px solid;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        color: white;
         margin: 0 auto;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
     }
-    .score-badge .score-num {
-        font-size: 2.1rem;
-        font-weight: 800;
+    .score-ring .score-num {
+        font-size: 1.8rem;
+        font-weight: 600;
         line-height: 1;
     }
-    .score-badge .score-denom {
-        font-size: 0.75rem;
-        opacity: 0.85;
+    .score-ring .score-denom {
+        font-size: 0.68rem;
+        opacity: 0.6;
         margin-top: 2px;
+    }
+    .tier-label {
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.72rem;
+        font-weight: 600;
+        margin-top: 8px;
     }
     </style>
     """,
@@ -95,14 +113,16 @@ st.markdown(
 # Header
 # --------------------------------------------------------------------------
 
-st.markdown('<div class="hero-title">📄 Resume ATS Tracker</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">Resume ATS Tracker</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-eyebrow">Match analysis report</div>', unsafe_allow_html=True)
+st.markdown('<hr class="hero-rule" />', unsafe_allow_html=True)
 st.markdown(
     '<div class="hero-subtitle">Upload a resume and paste a job description to get an '
     "ATS-style match score, keyword gap analysis, and tailored improvement suggestions "
     "— powered by Gemini.</div>",
     unsafe_allow_html=True,
 )
-st.caption(f"Model: `{model_name}`" + (" · API key loaded " if api_key else " · ⚠️ GEMINI_API_KEY not set"))
+st.caption(f"Model: `{model_name}`" + (" · API key loaded " if api_key else " · API key not set"))
 
 st.write("")
 
@@ -130,7 +150,7 @@ with col2:
         )
 
 st.write("")
-analyze_clicked = st.button("🔍 Analyze Resume", type="primary", use_container_width=True)
+analyze_clicked = st.button("Analyze Resume", type="primary", use_container_width=True)
 
 
 # Prompts
@@ -274,37 +294,39 @@ def rewrite_bullets(api_key: str, model_name: str, resume: str, jd: str) -> list
     return data.get("rewrites", [])
 
 
-def score_color(score: int) -> str:
+def score_tier(score: int) -> str:
     if score >= 80:
-        return "🟢"
+        return "Strong match"
     if score >= 60:
-        return "🟡"
-    return "🔴"
+        return "Moderate match"
+    return "Weak match"
 
 
 def score_hex(score: int) -> str:
     if score >= 80:
-        return "#16a34a"  # green
+        return "#3b6d11"  # green
     if score >= 60:
-        return "#b45309"  # amber
-    return "#dc2626"  # red
+        return "#854f0b"  # amber
+    return "#791f1f"  # red
 
 
 def render_score_badge(score: int) -> str:
     color = score_hex(score)
     return (
-        f'<div class="score-badge" style="background:{color};">'
+        f'<div class="score-ring" style="border-color:{color};">'
         f'<span class="score-num">{score}</span>'
         f'<span class="score-denom">/ 100</span>'
         f"</div>"
+        f'<div class="tier-label" style="color:{color};">{score_tier(score)}</div>'
     )
 
 
 def render_pills(items: list, kind: str) -> str:
-    css_class = "pill-good" if kind == "good" else "pill-bad"
+    css_class = "tag-good" if kind == "good" else "tag-bad"
+    mark = "✓" if kind == "good" else "✕"
     if not items:
         return '<span style="opacity:0.6;">None</span>'
-    return "".join(f'<span class="pill {css_class}">{k}</span>' for k in items)
+    return "".join(f'<span class="tag {css_class}">{mark} {k}</span>' for k in items)
 
 
 def _pdf_safe(text: str) -> str:
@@ -447,43 +469,43 @@ if result:
         with top1:
             st.markdown(render_score_badge(score), unsafe_allow_html=True)
         with top2:
-            st.markdown(f"#### {score_color(score)} Verdict")
+            st.subheader("Verdict")
             st.write(result.get("verdict", "—"))
 
     st.write("")
     c1, c2 = st.columns(2)
     with c1:
         with st.container(border=True):
-            st.subheader("✅ Matched Keywords")
+            st.subheader("Matched Keywords")
             st.markdown(render_pills(result.get("matched_keywords", []), "good"), unsafe_allow_html=True)
 
         st.write("")
         with st.container(border=True):
-            st.subheader("💪 Strengths")
+            st.subheader("Strengths")
             for s in result.get("strengths", []):
                 st.markdown(f"- {s}")
 
     with c2:
         with st.container(border=True):
-            st.subheader("❌ Missing Keywords")
+            st.subheader("Missing Keywords")
             st.markdown(render_pills(result.get("missing_keywords", []), "bad"), unsafe_allow_html=True)
 
         st.write("")
         with st.container(border=True):
-            st.subheader("⚠️ Weaknesses")
+            st.subheader("Weaknesses")
             for w in result.get("weaknesses", []):
                 st.markdown(f"- {w}")
 
     st.write("")
     with st.container(border=True):
-        st.subheader("🛠️ Suggestions to Improve")
+        st.subheader("Suggestions to Improve")
         for sug in result.get("suggestions", []):
             st.markdown(f"- {sug}")
 
     if fmt_issues:
         st.write("")
         with st.container(border=True):
-            st.subheader("📐 ATS Formatting Risks")
+            st.subheader("ATS Formatting Risks")
             for f in fmt_issues:
                 st.markdown(f"- {f}")
 
@@ -491,14 +513,14 @@ if result:
     # Extra features: cover letter + bullet rewriter
     # ----------------------------------------------------------------
     st.divider()
-    st.subheader("✨ More tools")
+    st.subheader("More Tools")
 
     tab_cover, tab_bullets, tab_export = st.tabs(
-        ["✍️ Cover Letter", "🔁 Bullet Rewrites", "⬇️ Export"]
+        ["Cover Letter", "Bullet Rewrites", "Export"]
     )
 
     with tab_cover:
-        if st.button("✍️ Generate Cover Letter", use_container_width=True):
+        if st.button("Generate Cover Letter", use_container_width=True):
             with st.spinner("Writing cover letter..."):
                 try:
                     st.session_state["cover_letter"] = generate_cover_letter(
@@ -511,7 +533,7 @@ if result:
         if cover_letter:
             st.text_area("Cover letter", value=cover_letter, height=280, label_visibility="collapsed")
             st.download_button(
-                "⬇️ Download Cover Letter (.txt)",
+                "Download Cover Letter (.txt)",
                 data=cover_letter,
                 file_name="cover_letter.txt",
                 mime="text/plain",
@@ -520,7 +542,7 @@ if result:
             st.caption("Click the button to draft a cover letter tailored to this resume + job description.")
 
     with tab_bullets:
-        if st.button("🔁 Rewrite Weak Bullets", use_container_width=True):
+        if st.button("Rewrite Weak Bullets", use_container_width=True):
             with st.spinner("Rewriting weak bullets..."):
                 try:
                     st.session_state["bullet_rewrites"] = rewrite_bullets(
@@ -581,7 +603,7 @@ if result:
         ecol1, ecol2 = st.columns(2)
         with ecol1:
             st.download_button(
-                "⬇️ Download Report (Markdown)",
+                "Download Report (Markdown)",
                 data=report_md,
                 file_name="resume_ats_report.md",
                 mime="text/markdown",
@@ -591,7 +613,7 @@ if result:
             try:
                 pdf_bytes = build_pdf_report(result, cover_letter=cover_letter, bullet_rewrites=bullet_rewrites)
                 st.download_button(
-                    "⬇️ Download Report (PDF)",
+                    "Download Report (PDF)",
                     data=pdf_bytes,
                     file_name="resume_ats_report.pdf",
                     mime="application/pdf",
