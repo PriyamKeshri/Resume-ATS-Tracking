@@ -24,37 +24,112 @@ st.set_page_config(
     layout="wide",
 )
 
-# Main Layout
+# --------------------------------------------------------------------------
+# Styling
+# --------------------------------------------------------------------------
 
-st.title("📄 Resume ATS Tracker")
-st.write(
-    "Upload a resume and paste a job description to get an ATS-style match "
-    "score, keyword gap analysis, and tailored improvement suggestions — "
-    "powered by Gemini."
+st.markdown(
+    """
+    <style>
+    .hero-title {
+        font-size: 2.4rem;
+        font-weight: 800;
+        margin-bottom: 0.1rem;
+        background: linear-gradient(90deg, #6366f1, #ec4899);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .hero-subtitle {
+        opacity: 0.75;
+        font-size: 1rem;
+        margin-bottom: 0.4rem;
+    }
+    .pill {
+        display: inline-block;
+        padding: 4px 12px;
+        margin: 3px 6px 3px 0;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 1px solid transparent;
+    }
+    .pill-good {
+        background: rgba(16, 185, 129, 0.14);
+        color: #10b981;
+        border-color: rgba(16, 185, 129, 0.4);
+    }
+    .pill-bad {
+        background: rgba(239, 68, 68, 0.14);
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.4);
+    }
+    .score-badge {
+        width: 128px;
+        height: 128px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        margin: 0 auto;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    .score-badge .score-num {
+        font-size: 2.1rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+    .score-badge .score-denom {
+        font-size: 0.75rem;
+        opacity: 0.85;
+        margin-top: 2px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --------------------------------------------------------------------------
+# Header
+# --------------------------------------------------------------------------
+
+st.markdown('<div class="hero-title">📄 Resume ATS Tracker</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-subtitle">Upload a resume and paste a job description to get an '
+    "ATS-style match score, keyword gap analysis, and tailored improvement suggestions "
+    "— powered by Gemini.</div>",
+    unsafe_allow_html=True,
 )
 st.caption(f"Model: `{model_name}`" + (" · API key loaded " if api_key else " · ⚠️ GEMINI_API_KEY not set"))
+
+st.write("")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("1. Resume")
-    resume_file = st.file_uploader(
-        "Upload resume (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"]
-    )
-    resume_text_manual = st.text_area(
-        "...or paste resume text directly",
-        height=220,
-        placeholder="Paste resume content here if you'd rather not upload a file.",
-    )
+    with st.container(border=True):
+        st.subheader("1. Resume")
+        resume_file = st.file_uploader(
+            "Upload resume (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"]
+        )
+        resume_text_manual = st.text_area(
+            "...or paste resume text directly",
+            height=220,
+            placeholder="Paste resume content here if you'd rather not upload a file.",
+        )
 
 with col2:
-    st.subheader("2. Job Description")
-    jd_text = st.text_area(
-        "Paste the target job description",
-        height=300,
-        placeholder="Paste the full job posting text here...",
-    )
+    with st.container(border=True):
+        st.subheader("2. Job Description")
+        jd_text = st.text_area(
+            "Paste the target job description",
+            height=300,
+            placeholder="Paste the full job posting text here...",
+        )
 
+st.write("")
 analyze_clicked = st.button("🔍 Analyze Resume", type="primary", use_container_width=True)
 
 
@@ -207,6 +282,31 @@ def score_color(score: int) -> str:
     return "🔴"
 
 
+def score_hex(score: int) -> str:
+    if score >= 80:
+        return "#16a34a"  # green
+    if score >= 60:
+        return "#b45309"  # amber
+    return "#dc2626"  # red
+
+
+def render_score_badge(score: int) -> str:
+    color = score_hex(score)
+    return (
+        f'<div class="score-badge" style="background:{color};">'
+        f'<span class="score-num">{score}</span>'
+        f'<span class="score-denom">/ 100</span>'
+        f"</div>"
+    )
+
+
+def render_pills(items: list, kind: str) -> str:
+    css_class = "pill-good" if kind == "good" else "pill-bad"
+    if not items:
+        return '<span style="opacity:0.6;">None</span>'
+    return "".join(f'<span class="pill {css_class}">{k}</span>' for k in items)
+
+
 def _pdf_safe(text: str) -> str:
     """Core PDF fonts only support Latin-1 — drop anything outside that range."""
     if not text:
@@ -340,52 +440,64 @@ if result:
 
     st.divider()
     score = int(result.get("match_score", 0))
+    fmt_issues = result.get("formatting_issues", [])
 
-    top1, top2 = st.columns([1, 3])
-    with top1:
-        st.metric("ATS Match Score", f"{score}/100", delta=None)
-        st.progress(min(max(score, 0), 100) / 100)
-    with top2:
-        st.subheader(f"{score_color(score)} Verdict")
-        st.write(result.get("verdict", "—"))
+    with st.container(border=True):
+        top1, top2 = st.columns([1, 3])
+        with top1:
+            st.markdown(render_score_badge(score), unsafe_allow_html=True)
+        with top2:
+            st.markdown(f"#### {score_color(score)} Verdict")
+            st.write(result.get("verdict", "—"))
 
+    st.write("")
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("✅ Matched Keywords")
-        kws = result.get("matched_keywords", [])
-        st.write(", ".join(f"`{k}`" for k in kws) if kws else "None found.")
+        with st.container(border=True):
+            st.subheader("✅ Matched Keywords")
+            st.markdown(render_pills(result.get("matched_keywords", []), "good"), unsafe_allow_html=True)
 
-        st.subheader("💪 Strengths")
-        for s in result.get("strengths", []):
-            st.markdown(f"- {s}")
+        st.write("")
+        with st.container(border=True):
+            st.subheader("💪 Strengths")
+            for s in result.get("strengths", []):
+                st.markdown(f"- {s}")
 
     with c2:
-        st.subheader("❌ Missing Keywords")
-        mkws = result.get("missing_keywords", [])
-        st.write(", ".join(f"`{k}`" for k in mkws) if mkws else "None — great coverage!")
+        with st.container(border=True):
+            st.subheader("❌ Missing Keywords")
+            st.markdown(render_pills(result.get("missing_keywords", []), "bad"), unsafe_allow_html=True)
 
-        st.subheader("⚠️ Weaknesses")
-        for w in result.get("weaknesses", []):
-            st.markdown(f"- {w}")
+        st.write("")
+        with st.container(border=True):
+            st.subheader("⚠️ Weaknesses")
+            for w in result.get("weaknesses", []):
+                st.markdown(f"- {w}")
 
-    st.subheader("🛠️ Suggestions to Improve")
-    for sug in result.get("suggestions", []):
-        st.markdown(f"- {sug}")
+    st.write("")
+    with st.container(border=True):
+        st.subheader("🛠️ Suggestions to Improve")
+        for sug in result.get("suggestions", []):
+            st.markdown(f"- {sug}")
 
-    fmt_issues = result.get("formatting_issues", [])
     if fmt_issues:
-        st.subheader("📐 ATS Formatting Risks")
-        for f in fmt_issues:
-            st.markdown(f"- {f}")
+        st.write("")
+        with st.container(border=True):
+            st.subheader("📐 ATS Formatting Risks")
+            for f in fmt_issues:
+                st.markdown(f"- {f}")
 
     # ----------------------------------------------------------------
     # Extra features: cover letter + bullet rewriter
     # ----------------------------------------------------------------
     st.divider()
     st.subheader("✨ More tools")
-    fcol1, fcol2 = st.columns(2)
 
-    with fcol1:
+    tab_cover, tab_bullets, tab_export = st.tabs(
+        ["✍️ Cover Letter", "🔁 Bullet Rewrites", "⬇️ Export"]
+    )
+
+    with tab_cover:
         if st.button("✍️ Generate Cover Letter", use_container_width=True):
             with st.spinner("Writing cover letter..."):
                 try:
@@ -395,7 +507,19 @@ if result:
                 except Exception as e:
                     st.error(f"Cover letter generation failed: {e}")
 
-    with fcol2:
+        cover_letter = st.session_state.get("cover_letter")
+        if cover_letter:
+            st.text_area("Cover letter", value=cover_letter, height=280, label_visibility="collapsed")
+            st.download_button(
+                "⬇️ Download Cover Letter (.txt)",
+                data=cover_letter,
+                file_name="cover_letter.txt",
+                mime="text/plain",
+            )
+        else:
+            st.caption("Click the button to draft a cover letter tailored to this resume + job description.")
+
+    with tab_bullets:
         if st.button("🔁 Rewrite Weak Bullets", use_container_width=True):
             with st.spinner("Rewriting weak bullets..."):
                 try:
@@ -405,33 +529,22 @@ if result:
                 except Exception as e:
                     st.error(f"Bullet rewriting failed: {e}")
 
+        bullet_rewrites = st.session_state.get("bullet_rewrites")
+        if bullet_rewrites:
+            for r in bullet_rewrites:
+                with st.container(border=True):
+                    st.markdown(f"**Original:** {r.get('original', '')}")
+                    st.markdown(f"**Improved:** {r.get('improved', '')}")
+                    if r.get("reason"):
+                        st.caption(f"Why: {r.get('reason')}")
+        else:
+            st.caption("Click the button to get stronger rewrites of your weakest resume bullets.")
+
     cover_letter = st.session_state.get("cover_letter")
-    if cover_letter:
-        st.markdown("#### ✍️ Tailored Cover Letter")
-        st.text_area("Cover letter", value=cover_letter, height=280, label_visibility="collapsed")
-        st.download_button(
-            "⬇️ Download Cover Letter (.txt)",
-            data=cover_letter,
-            file_name="cover_letter.txt",
-            mime="text/plain",
-        )
-
     bullet_rewrites = st.session_state.get("bullet_rewrites")
-    if bullet_rewrites:
-        st.markdown("#### 🔁 Suggested Bullet Rewrites")
-        for r in bullet_rewrites:
-            with st.container(border=True):
-                st.markdown(f"**Original:** {r.get('original', '')}")
-                st.markdown(f"**Improved:** {r.get('improved', '')}")
-                if r.get("reason"):
-                    st.caption(f"Why: {r.get('reason')}")
 
-    # Export
-
-    st.divider()
-    st.subheader("⬇️ Export Report")
-
-    report_md = f"""# Resume ATS Report
+    with tab_export:
+        report_md = f"""# Resume ATS Report
 
 **Match Score:** {score}/100
 **Verdict:** {result.get('verdict', '')}
@@ -454,37 +567,38 @@ if result:
 ## Formatting Risks
 {chr(10).join('- ' + f for f in fmt_issues)}
 """
-    if bullet_rewrites:
-        report_md += "\n## Suggested Bullet Rewrites\n"
-        for r in bullet_rewrites:
-            report_md += f"\n- **Original:** {r.get('original', '')}\n  **Improved:** {r.get('improved', '')}\n"
-            if r.get("reason"):
-                report_md += f"  *Why:* {r.get('reason')}\n"
+        if bullet_rewrites:
+            report_md += "\n## Suggested Bullet Rewrites\n"
+            for r in bullet_rewrites:
+                report_md += f"\n- **Original:** {r.get('original', '')}\n  **Improved:** {r.get('improved', '')}\n"
+                if r.get("reason"):
+                    report_md += f"  *Why:* {r.get('reason')}\n"
 
-    if cover_letter:
-        report_md += f"\n## Cover Letter\n\n{cover_letter}\n"
+        if cover_letter:
+            report_md += f"\n## Cover Letter\n\n{cover_letter}\n"
 
-    ecol1, ecol2 = st.columns(2)
-    with ecol1:
-        st.download_button(
-            "⬇️ Download Report (Markdown)",
-            data=report_md,
-            file_name="resume_ats_report.md",
-            mime="text/markdown",
-            use_container_width=True,
-        )
-    with ecol2:
-        try:
-            pdf_bytes = build_pdf_report(result, cover_letter=cover_letter, bullet_rewrites=bullet_rewrites)
+        st.caption("Download the full analysis — including the cover letter and bullet rewrites above, if generated.")
+        ecol1, ecol2 = st.columns(2)
+        with ecol1:
             st.download_button(
-                "⬇️ Download Report (PDF)",
-                data=pdf_bytes,
-                file_name="resume_ats_report.pdf",
-                mime="application/pdf",
+                "⬇️ Download Report (Markdown)",
+                data=report_md,
+                file_name="resume_ats_report.md",
+                mime="text/markdown",
                 use_container_width=True,
             )
-        except Exception as e:
-            st.error(f"Could not build PDF: {e}")
+        with ecol2:
+            try:
+                pdf_bytes = build_pdf_report(result, cover_letter=cover_letter, bullet_rewrites=bullet_rewrites)
+                st.download_button(
+                    "⬇️ Download Report (PDF)",
+                    data=pdf_bytes,
+                    file_name="resume_ats_report.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"Could not build PDF: {e}")
 
     with st.expander("Raw JSON response"):
         st.json(result)
