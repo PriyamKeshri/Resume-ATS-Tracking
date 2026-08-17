@@ -46,7 +46,7 @@ st.markdown(
     }
     .hero-rule {
         border: none;
-        border-top: 1px solid rgba(128, 128, 128, 0.35);
+        border-top: 1px solid rgba(74, 222, 128, 0.4);
         margin: 0 0 1rem 0;
     }
     .hero-subtitle {
@@ -70,10 +70,10 @@ st.markdown(
         border: 1px solid rgba(128, 128, 128, 0.4);
     }
     .tag-good {
-        border-color: rgba(22, 101, 52, 0.55);
+        border-color: rgba(74, 222, 128, 0.7);
     }
     .tag-bad {
-        border-color: rgba(153, 27, 27, 0.55);
+        border-color: rgba(239, 68, 68, 0.55);
     }
     .score-ring {
         width: 110px;
@@ -126,23 +126,72 @@ st.caption(f"Model: `{model_name}`" + (" · API key loaded " if api_key else " �
 
 st.write("")
 
-with st.container(border=True):
-    st.subheader("Features")
-    feat1, feat2 = st.columns(2)
-    with feat1:
-        st.markdown(
-            "- **Match score & verdict** — a 0–100 ATS-style score with an overall fit summary\n"
-            "- **Keyword gap analysis** — matched vs. missing keywords pulled from the job description\n"
-            "- **Strengths & weaknesses** — a clear breakdown of what's working and what needs work\n"
-            "- **Formatting risk detection** — flags ATS-parsing hazards like tables, columns, or missing sections"
-        )
-    with feat2:
-        st.markdown(
-            "- **Cover letter generator** — drafts a tailored cover letter from your resume and the job description\n"
-            "- **Bullet rewriter** — rewrites weak resume bullets with stronger, keyword-aligned phrasing\n"
-            "- **Grammar & spelling check** — flags spelling, grammar, and tense errors before you apply\n"
-            "- **Export** — download the full report as Markdown or PDF"
-        )
+FEATURE_GROUPS = [
+    (
+        "Analyze",
+        [
+            ("Match score & verdict", "A 0–100 ATS-style fit score with a plain-language verdict."),
+            ("Keyword gap analysis", "Matched vs. missing keywords pulled from the job description."),
+        ],
+    ),
+    (
+        "Improve",
+        [
+            ("Strengths & weaknesses", "What's working well, and what still needs work."),
+            ("Bullet rewriter", "Stronger, keyword-aligned phrasing for weak resume bullets."),
+            ("Grammar & spelling check", "Catches spelling, grammar, and tense errors."),
+        ],
+    ),
+    (
+        "Apply",
+        [
+            ("Formatting risk detection", "Flags ATS-parsing hazards like tables or missing sections."),
+            ("Cover letter generator", "A tailored draft built from your resume and the job description."),
+            ("Export", "Download the full report as Markdown or PDF."),
+        ],
+    ),
+]
+
+FEATURE_ICONS = {
+    "Analyze": (
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>'
+        "</svg>"
+    ),
+    "Improve": (
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<polyline points="3 17 9 11 13 15 21 7"></polyline>'
+        '<polyline points="14 7 21 7 21 14"></polyline>'
+        "</svg>"
+    ),
+    "Apply": (
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<line x1="22" y1="2" x2="11" y2="13"></line>'
+        '<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>'
+        "</svg>"
+    ),
+}
+
+FEATURE_ACCENT = "#4ADE80"
+
+feat_cols = st.columns(3)
+for col, (group_title, items) in zip(feat_cols, FEATURE_GROUPS):
+    with col:
+        with st.container(border=True):
+            st.markdown(
+                f'<h3 style="display:flex;align-items:center;gap:8px;color:{FEATURE_ACCENT};">'
+                f'{FEATURE_ICONS[group_title]}<span>{group_title}</span></h3>',
+                unsafe_allow_html=True,
+            )
+            check = f'<span style="color:{FEATURE_ACCENT};">✓</span>'
+            lines = []
+            for title, desc in items:
+                lines.append(f"- {check} **{title}**")
+                lines.append(f"  - {desc}")
+            st.markdown("\n".join(lines), unsafe_allow_html=True)
 
 st.write("")
 
@@ -352,10 +401,10 @@ def score_tier(score: int) -> str:
 
 def score_hex(score: int) -> str:
     if score >= 80:
-        return "#3b6d11"  # green
+        return "#4ADE80"  # light green — matches the app's accent color
     if score >= 60:
-        return "#854f0b"  # amber
-    return "#791f1f"  # red
+        return "#D4A017"  # amber
+    return "#EF4444"  # red
 
 
 def render_score_badge(score: int) -> str:
