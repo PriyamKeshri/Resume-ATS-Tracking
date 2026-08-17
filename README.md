@@ -9,6 +9,8 @@ resume bullets, all in one place.
 ![Gemini](https://img.shields.io/badge/AI-Gemini-8E75B2)
 ![License](https://img.shields.io/badge/license-MIT-4ADE80)
 
+**Live app:** [track-resume-ats.streamlit.app](https://track-resume-ats.streamlit.app)
+
 ---
 
 ## ✨ Features
