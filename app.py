@@ -126,6 +126,26 @@ st.caption(f"Model: `{model_name}`" + (" · API key loaded " if api_key else " �
 
 st.write("")
 
+with st.container(border=True):
+    st.subheader("Features")
+    feat1, feat2 = st.columns(2)
+    with feat1:
+        st.markdown(
+            "- **Match score & verdict** — a 0–100 ATS-style score with an overall fit summary\n"
+            "- **Keyword gap analysis** — matched vs. missing keywords pulled from the job description\n"
+            "- **Strengths & weaknesses** — a clear breakdown of what's working and what needs work\n"
+            "- **Formatting risk detection** — flags ATS-parsing hazards like tables, columns, or missing sections"
+        )
+    with feat2:
+        st.markdown(
+            "- **Cover letter generator** — drafts a tailored cover letter from your resume and the job description\n"
+            "- **Bullet rewriter** — rewrites weak resume bullets with stronger, keyword-aligned phrasing\n"
+            "- **Grammar & spelling check** — flags spelling, grammar, and tense errors before you apply\n"
+            "- **Export** — download the full report as Markdown or PDF"
+        )
+
+st.write("")
+
 col1, col2 = st.columns(2)
 
 with col1:
