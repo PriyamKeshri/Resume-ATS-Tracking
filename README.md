@@ -5,8 +5,9 @@ get an ATS-style match score, a keyword gap analysis, a tailored cover letter, a
 resume bullets, all in one place.
 
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
-![Streamlit](https://img.shields.io/badge/streamlit-app-FF4B4B)
+![Streamlit](https://img.shields.io/badge/streamlit-app-4ADE80)
 ![Gemini](https://img.shields.io/badge/AI-Gemini-8E75B2)
+![License](https://img.shields.io/badge/license-MIT-4ADE80)
 
 ---
 
@@ -21,6 +22,11 @@ resume bullets, all in one place.
 | 📐 **ATS Formatting Risks** | Flags parsing hazards like tables, columns, or missing sections |
 | ✍️ **Cover Letter Generator** | One click drafts a tailored cover letter from the resume + JD |
 | 🔁 **Bullet Rewriter** | Rewrites the weakest resume bullets with stronger, keyword-aligned phrasing |
+| ✅ **Grammar & Spelling Check** | Flags spelling, grammar, and tense errors, with corrected snippets |
+| ⬇️ **Export** | Download the full report as Markdown or PDF |
+
+The homepage itself also lays out the toolkit at a glance, grouped into three stages —
+**Analyze**, **Improve**, and **Apply** — before you upload anything.
 
 ## 🚀 Quick Start
 
@@ -52,15 +58,21 @@ streamlit run app.py
 
 ```
 Resume-ATS-Tracking/
-├── app.py              # Streamlit UI + Gemini calls + result rendering
-├── resume_parser.py    # PDF / DOCX / TXT text extraction for uploaded resumes
-├── requirements.txt    # Python dependencies
-└── .env                # Gemini API key & model config (not committed)
+├── app.py                    # Streamlit UI + Gemini calls + result rendering
+├── resume_parser.py          # PDF / DOCX / TXT text extraction for uploaded resumes
+├── requirements.txt          # Python dependencies
+├── .streamlit/config.toml    # App theme (black background, light green accent)
+├── LICENSE                   # MIT license
+└── .env                      # Gemini API key & model config (not committed)
 ```
 
 ## 🧰 Tech Stack
 
 - [Streamlit](https://streamlit.io/) — UI
-- [Google Gemini API](https://ai.google.dev/) — resume/JD analysis, cover letters, bullet rewrites
+- [Google Gemini API](https://ai.google.dev/) — resume/JD analysis, cover letters, bullet rewrites, grammar check
 - `pdfplumber` / `python-docx` — resume text extraction
 - `fpdf2` — PDF report export
+
+## 📄 License
+
+[MIT](LICENSE)
