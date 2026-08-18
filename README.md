@@ -1,15 +1,19 @@
+<div align="center">
+
 # 📄 Resume ATS Tracker
 
 A Streamlit app that scores a resume against a job description using the Google Gemini API —
 get an ATS-style match score, a keyword gap analysis, a tailored cover letter, and AI-rewritten
 resume bullets, all in one place.
 
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
-![Streamlit](https://img.shields.io/badge/streamlit-app-4ADE80)
-![Gemini](https://img.shields.io/badge/AI-Gemini-8E75B2)
-![License](https://img.shields.io/badge/license-MIT-4ADE80)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-4ADE80?style=for-the-badge)
 
-**Live app:** [track-resume-ats.streamlit.app](https://track-resume-ats.streamlit.app)
+🔗 **[Try it live](https://track-resume-ats.streamlit.app)**
+
+</div>
 
 ---
 
@@ -27,22 +31,23 @@ resume bullets, all in one place.
 | ✅ **Grammar & Spelling Check** | Flags spelling, grammar, and tense errors, with corrected snippets |
 | ⬇️ **Export** | Download the full report as Markdown or PDF |
 
-The homepage itself also lays out the toolkit at a glance, grouped into three stages —
-**Analyze**, **Improve**, and **Apply** — before you upload anything.
+---
 
 ## 📸 Screenshots
 
-**Homepage** — features overview before you upload anything
+<p align="center"><b>Homepage</b> — features overview before you upload anything</p>
 
 ![Homepage](docs/screenshots/01-homepage.png)
 
-**Analysis results** — match score, verdict, and matched/missing keywords
+<p align="center"><b>Analysis results</b> — match score, verdict, and matched/missing keywords</p>
 
 ![Analysis results](docs/screenshots/02-results.png)
 
-**Suggestions + More Tools** — actionable edits, plus cover letter, bullet rewriter, grammar check, and export
+<p align="center"><b>Suggestions + More Tools</b> — actionable edits, plus cover letter, bullet rewriter, grammar check, and export</p>
 
 ![More tools](docs/screenshots/03-more-tools.png)
+
+---
 
 ## 🚀 Quick Start
 
@@ -70,25 +75,22 @@ streamlit run app.py
 
 **4. Use it** — upload or paste a resume, paste a job description, and click **Analyze Resume**.
 
-## 🗂️ Project Structure
-
-```
-Resume-ATS-Tracking/
-├── app.py                    # Streamlit UI + Gemini calls + result rendering
-├── resume_parser.py          # PDF / DOCX / TXT text extraction for uploaded resumes
-├── requirements.txt          # Python dependencies
-├── .streamlit/config.toml    # App theme (black background, light green accent)
-├── LICENSE                   # MIT license
-└── .env                      # Gemini API key & model config (not committed)
-```
+---
 
 ## 🧰 Tech Stack
 
-- [Streamlit](https://streamlit.io/) — UI
-- [Google Gemini API](https://ai.google.dev/) — resume/JD analysis, cover letters, bullet rewrites, grammar check
-- `pdfplumber` / `python-docx` — resume text extraction
-- `fpdf2` — PDF report export
+<p align="center">
+  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white"/>
+  <img src="https://img.shields.io/badge/pdfplumber-1E293B?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/python--docx-1E293B?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/fpdf2-1E293B?style=for-the-badge"/>
+</p>
 
-## 📄 License
+---
 
-[MIT](LICENSE)
+<div align="center">
+
+📄 [MIT License](LICENSE)
+
+</div>
