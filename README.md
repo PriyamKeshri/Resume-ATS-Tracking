@@ -30,6 +30,20 @@ resume bullets, all in one place.
 The homepage itself also lays out the toolkit at a glance, grouped into three stages —
 **Analyze**, **Improve**, and **Apply** — before you upload anything.
 
+## 📸 Screenshots
+
+**Homepage** — features overview before you upload anything
+
+![Homepage](docs/screenshots/01-homepage.png)
+
+**Analysis results** — match score, verdict, and matched/missing keywords
+
+![Analysis results](docs/screenshots/02-results.png)
+
+**Suggestions + More Tools** — actionable edits, plus cover letter, bullet rewriter, grammar check, and export
+
+![More tools](docs/screenshots/03-more-tools.png)
+
 ## 🚀 Quick Start
 
 **1. Install dependencies**
