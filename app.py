@@ -1,4 +1,3 @@
-import io
 import json
 import os
 import re
@@ -703,10 +702,6 @@ if result:
                 st.caption("No grammar or spelling issues found.")
         else:
             st.caption("Click the button to proofread the resume for grammar, spelling, and punctuation errors.")
-
-    cover_letter = st.session_state.get("cover_letter")
-    bullet_rewrites = st.session_state.get("bullet_rewrites")
-    grammar_issues = st.session_state.get("grammar_issues")
 
     with tab_export:
         report_md = f"""# Resume ATS Report
