@@ -35,38 +35,25 @@ resume bullets, all in one place.
 
 ## ⚙️ How It Works
 
-**1. You provide a resume and a job description**
+```mermaid
+flowchart LR
+    A["📤<br/>Resume + JD"] --> B["🔎<br/>Text Extraction"]
+    B --> C["🤖<br/>Gemini Analysis"]
+    C --> D["📊<br/>Structured JSON"]
+    D --> E["🖥️<br/>Report UI"]
+    E --> F["🛠️<br/>On-demand Tools"]
+    F --> G["📥<br/>Export"]
+```
 
-Upload a PDF/DOCX/TXT file or paste the resume text directly, then paste the job posting
-you're targeting.
-
-**2. Text extraction**
-
-For uploaded files, `resume_parser.py` pulls out plain text — including table cells, since
-resumes often use tables for layout that plain paragraph parsing would miss.
-
-**3. Structured analysis via Gemini**
-
-The resume and job description are sent to the Gemini API with a prompt that requests a
-strict JSON response (`response_mime_type="application/json"`): match score, verdict,
-matched/missing keywords, strengths, weaknesses, suggestions, and formatting risks. The
-response is parsed defensively — the app never assumes it's clean.
-
-**4. Report rendering**
-
-That JSON directly drives the UI: the score ring's color and tier label, the green/red
-keyword tags, and the strengths/weaknesses/suggestions cards.
-
-**5. On-demand tools**
-
-The cover letter generator, bullet rewriter, and grammar checker are separate, independent
-Gemini calls — they only run when you click their button, each with its own prompt tailored
-to that specific task.
-
-**6. Export**
-
-The full report — plus any cover letter, bullet rewrites, or grammar fixes you generated —
-can be downloaded as Markdown or as a formatted PDF (built with `fpdf2`).
+| | Step | What happens |
+|---|---|---|
+| 📤 | **Input** | Upload a PDF/DOCX/TXT resume or paste it directly, then paste the target job description. |
+| 🔎 | **Extraction** | `resume_parser.py` pulls plain text out of the file — including table cells, since resumes often use tables for layout. |
+| 🤖 | **Gemini analysis** | The resume + JD are sent to Gemini with a prompt that forces a strict JSON response (`response_mime_type="application/json"`). |
+| 📊 | **Structured JSON** | Match score, verdict, matched/missing keywords, strengths, weaknesses, suggestions, and formatting risks — parsed defensively, never assumed clean. |
+| 🖥️ | **Report UI** | The JSON drives the score ring's color/tier, the green/red keyword tags, and every results card. |
+| 🛠️ | **On-demand tools** | The cover letter generator, bullet rewriter, and grammar checker are separate Gemini calls, only triggered on click. |
+| 📥 | **Export** | Download everything — report, cover letter, rewrites, grammar fixes — as Markdown or a formatted PDF (`fpdf2`). |
 
 ---
 
