@@ -37,12 +37,12 @@ resume bullets, all in one place.
 
 ```mermaid
 flowchart LR
-    A["📤<br/>Resume + JD"] --> B["🔎<br/>Text Extraction"]
-    B --> C["🤖<br/>Gemini Analysis"]
-    C --> D["📊<br/>Structured JSON"]
-    D --> E["🖥️<br/>Report UI"]
-    E --> F["🛠️<br/>On-demand Tools"]
-    F --> G["📥<br/>Export"]
+    A["📤 Resume + JD"] --> B["🔎 Text Extraction"]
+    B --> C["🤖 Gemini Analysis"]
+    C --> D["📊 Structured JSON"]
+    D --> E["🖥️ Report UI"]
+    E --> F["🛠️ On-demand Tools"]
+    F --> G["📥 Export"]
 ```
 
 | | Step | What happens |
