@@ -11,6 +11,8 @@ resume bullets, all in one place.
 ![Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-4ADE80?style=for-the-badge)
 
+[![CI](https://github.com/PriyamKeshri/Resume-ATS-Tracking/actions/workflows/ci.yml/badge.svg)](https://github.com/PriyamKeshri/Resume-ATS-Tracking/actions/workflows/ci.yml)
+
 🔗 **[Try it live](https://track-resume-ats.streamlit.app)**
 
 </div>
