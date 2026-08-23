@@ -99,6 +99,13 @@ streamlit run app.py
 
 **4. Use it** — upload or paste a resume, paste a job description, and click **Analyze Resume**.
 
+**5. (Optional) Run the tests**
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ---
 
 ## 🧰 Tech Stack
