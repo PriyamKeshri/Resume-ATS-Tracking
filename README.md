@@ -124,6 +124,6 @@ pytest
 
 <div align="center">
 
-📄 [MIT License](LICENSE)
+📄 [MIT License](LICENSE) · 📝 [Changelog](CHANGELOG.md)
 
 </div>
