@@ -10,6 +10,9 @@ from fpdf import FPDF
 
 from resume_parser import extract_text
 
+import llm_retry
+import llm_telemetry
+
 # Config
 
 load_dotenv()
@@ -221,6 +224,16 @@ st.write("")
 analyze_clicked = st.button("Analyze Resume", type="primary", use_container_width=True)
 
 
+# Telemetry readout — makes the call count visible while using the app, so a
+# burst of calls is something you notice rather than infer from a 429.
+
+with st.sidebar:
+    st.caption("Session telemetry")
+    st.metric("Gemini calls this session", llm_telemetry.session_calls())
+    st.caption(f"Logging to `{os.path.relpath(llm_telemetry.LOG_PATH)}`")
+    st.caption("Report: `python llm_telemetry.py`")
+
+
 # Prompts
 
 ANALYSIS_PROMPT = """You are an expert ATS (Applicant Tracking System) and technical recruiter.
@@ -345,48 +358,63 @@ def parse_json_response(raw_text: str) -> dict:
     raise ValueError("Could not parse a JSON object from the model response.")
 
 
-def call_gemini_json(api_key: str, model_name: str, prompt: str) -> dict:
+def call_gemini_json(api_key: str, model_name: str, prompt: str, feature: str) -> dict:
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            temperature=0.2,
-            response_mime_type="application/json",
-        ),
+
+    def _do(call):
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                response_mime_type="application/json",
+            ),
+        )
+        # Anything that throws past this point is our parsing, not the API.
+        call.api_ok(response)
+        return parse_json_response(response.text)
+
+    return llm_retry.call_with_retry(
+        _do, feature=feature, model_name=model_name, prompt_chars=len(prompt)
     )
-    return parse_json_response(response.text)
 
 
-def call_gemini_text(api_key: str, model_name: str, prompt: str) -> str:
+def call_gemini_text(api_key: str, model_name: str, prompt: str, feature: str) -> str:
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model=model_name,
-        contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.4),
+
+    def _do(call):
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.4),
+        )
+        call.api_ok(response)
+        return response.text.strip()
+
+    return llm_retry.call_with_retry(
+        _do, feature=feature, model_name=model_name, prompt_chars=len(prompt)
     )
-    return response.text.strip()
 
 
 def analyze_resume(api_key: str, model_name: str, resume: str, jd: str) -> dict:
     prompt = ANALYSIS_PROMPT.format(resume=resume[:15000], jd=jd[:8000])
-    return call_gemini_json(api_key, model_name, prompt)
+    return call_gemini_json(api_key, model_name, prompt, "analyze")
 
 
 def generate_cover_letter(api_key: str, model_name: str, resume: str, jd: str) -> str:
     prompt = COVER_LETTER_PROMPT.format(resume=resume[:15000], jd=jd[:8000])
-    return call_gemini_text(api_key, model_name, prompt)
+    return call_gemini_text(api_key, model_name, prompt, "cover_letter")
 
 
 def rewrite_bullets(api_key: str, model_name: str, resume: str, jd: str) -> list:
     prompt = BULLET_REWRITE_PROMPT.format(resume=resume[:15000], jd=jd[:8000])
-    data = call_gemini_json(api_key, model_name, prompt)
+    data = call_gemini_json(api_key, model_name, prompt, "bullet_rewrite")
     return data.get("rewrites", [])
 
 
 def check_grammar(api_key: str, model_name: str, resume: str) -> list:
     prompt = GRAMMAR_PROMPT.format(resume=resume[:15000])
-    data = call_gemini_json(api_key, model_name, prompt)
+    data = call_gemini_json(api_key, model_name, prompt, "grammar")
     return data.get("issues", [])
 
 
@@ -550,12 +578,10 @@ if analyze_clicked:
         try:
             result = analyze_resume(api_key, model_name, resume_text, jd_text)
         except Exception as e:
-            st.error(
-                f"Gemini API call failed: {e}\n\n"
-                "If this is a 'model not found' error, set GEMINI_MODEL in your "
-                "`.env` file to a different model id (e.g. gemini-2.5-flash) and "
-                "restart the app."
-            )
+            cause, advice = llm_retry.explain(e)
+            st.error(f"Analysis failed ({cause}). {advice}")
+            with st.expander("Technical detail"):
+                st.code(str(e))
             st.stop()
 
     st.session_state["last_result"] = result
@@ -641,7 +667,8 @@ if result:
                         api_key, model_name, saved_resume, saved_jd
                     )
                 except Exception as e:
-                    st.error(f"Cover letter generation failed: {e}")
+                    cause, advice = llm_retry.explain(e)
+                    st.error(f"Cover letter failed ({cause}). {advice}")
 
         cover_letter = st.session_state.get("cover_letter")
         if cover_letter:
@@ -663,7 +690,8 @@ if result:
                         api_key, model_name, saved_resume, saved_jd
                     )
                 except Exception as e:
-                    st.error(f"Bullet rewriting failed: {e}")
+                    cause, advice = llm_retry.explain(e)
+                    st.error(f"Bullet rewrite failed ({cause}). {advice}")
 
         bullet_rewrites = st.session_state.get("bullet_rewrites")
         if bullet_rewrites:
@@ -684,7 +712,8 @@ if result:
                         api_key, model_name, saved_resume
                     )
                 except Exception as e:
-                    st.error(f"Grammar check failed: {e}")
+                    cause, advice = llm_retry.explain(e)
+                    st.error(f"Grammar check failed ({cause}). {advice}")
 
         grammar_issues = st.session_state.get("grammar_issues")
         if grammar_issues is not None:
